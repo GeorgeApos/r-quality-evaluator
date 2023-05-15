@@ -32,9 +32,17 @@ public class FileAnalysis {
     @Getter
     @Setter
     private List<String> linterComments = new ArrayList<>();
-    @Column(name = "linterCommentsCounter")
+    @Column(name = "cycloComplexity")
     @Getter
     @Setter
     private int cycloComplexity;
+    @Column(name = "stylerResult")
+    @Getter
+    @Setter
+    private String stylerResult;
+    @Column(name = "goodPractises")
+    @Getter
+    @Setter
+    private String goodPractises;
 
 }
