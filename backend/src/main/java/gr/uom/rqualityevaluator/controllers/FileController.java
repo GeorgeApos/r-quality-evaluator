@@ -4,10 +4,10 @@ import gr.uom.rqualityevaluator.models.FileAnalysis;
 import gr.uom.rqualityevaluator.service.FileService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 
 @RestController
 @CrossOrigin("*")
@@ -17,9 +17,11 @@ public class FileController {
     @Autowired
     private FileService fileService;
 
-    @PostMapping("/")
-    public ResponseEntity<FileAnalysis> startMainAnalysis() {
-        FileAnalysis fileAnalysis = FileService.startMainAnalysis();
+    @PostMapping("/upload")
+    public ResponseEntity<FileAnalysis> handleFileUpload(
+            @RequestParam("owner") String owner,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        FileAnalysis fileAnalysis = FileService.startMainAnalysis(file, owner);
         fileService.saveFile(fileAnalysis);
         return ResponseEntity.ok(fileAnalysis);
     }
