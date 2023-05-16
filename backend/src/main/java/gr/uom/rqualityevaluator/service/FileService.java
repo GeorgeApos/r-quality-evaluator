@@ -39,7 +39,7 @@ public class FileService {
     }
 
     private static void executeAnalysis(FileAnalysis fileAnalysis, Path path) {
-        
+
     }
 
     private static void deleteFileFromDirectory(MultipartFile file, Path path) {
