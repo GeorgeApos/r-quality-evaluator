@@ -2,6 +2,7 @@ package gr.uom.rqualityevaluator.service;
 
 import gr.uom.rqualityevaluator.models.FileAnalysis;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -15,18 +16,15 @@ import java.nio.file.StandardCopyOption;
 import java.util.Objects;
 
 @Service
+@Configuration
 public class FileService {
-
-    @Value("${upload.directory}")
-    private static String uploadDirectory;
-
 
     public static FileAnalysis startMainAnalysis(MultipartFile file, String owner) throws IOException {
         FileAnalysis fileAnalysis = new FileAnalysis();
         fileAnalysis.setName(file.getOriginalFilename());
         fileAnalysis.setOwner(owner);
 
-        Path path = Paths.get(uploadDirectory);
+        Path path = Paths.get(System.getProperty("user.dir"));
         if (!Files.exists(path)) {
             Files.createDirectories(path);
         }
@@ -39,7 +37,23 @@ public class FileService {
     }
 
     private static void executeAnalysis(FileAnalysis fileAnalysis, Path path) {
+        executeLinter(fileAnalysis, path);
+        executeCycloComplexity(fileAnalysis, path);
+        executeStyler(fileAnalysis, path);
+        executeGoodPractises(fileAnalysis, path);
+    }
 
+    private static void executeGoodPractises(FileAnalysis fileAnalysis, Path path) {
+    }
+
+    private static void executeStyler(FileAnalysis fileAnalysis, Path path) {
+    }
+
+    private static void executeCycloComplexity(FileAnalysis fileAnalysis, Path path) {
+    }
+
+    private static void executeLinter(FileAnalysis fileAnalysis, Path path) {
+        
     }
 
     private static void deleteFileFromDirectory(MultipartFile file, Path path) {
