@@ -1,15 +1,14 @@
 package gr.uom.rqualityevaluator.service;
 
+import com.github.rcaller.rstuff.*;
+import com.github.rcaller.util.Globals;
 import gr.uom.rqualityevaluator.models.FileAnalysis;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -23,7 +22,7 @@ import java.util.Objects;
 @Configuration
 public class FileService {
 
-    public static FileAnalysis startMainAnalysis(MultipartFile file, String owner) throws IOException {
+    public static FileAnalysis startMainAnalysis(MultipartFile file, String owner) throws IOException, InterruptedException {
         FileAnalysis fileAnalysis = new FileAnalysis();
         fileAnalysis.setName(file.getOriginalFilename());
         fileAnalysis.setOwner(owner);
@@ -34,88 +33,63 @@ public class FileService {
         }
         saveFileToDirectory(file, path);
 
-        setupREnvironment(fileAnalysis, path);
-
-        executeAnalysis(fileAnalysis, path);
+        executeCommands(fileAnalysis, path);
 
         deleteFileFromDirectory(file, path);
         return fileAnalysis;
     }
 
-    private static void setupREnvironment(FileAnalysis file, Path path) {
-        executeCommand(file, "R", path);
-        executeCommand(file, "install.packages(\"styler\")", path);
-        executeCommand(file, "install.packages(\"lintr\")", path);
-        executeCommand(file, "install.packages(\"goodpractice\")", path);
-        executeCommand(file, "install.packages(\"cyclocomp\")", path);
-        executeCommand(file, "library(styler)", path);
-        executeCommand(file, "library(lintr)", path);
-        executeCommand(file, "library(goodpractice)", path);
-        executeCommand(file, "library(cyclocomp)", path);
-        executeCommand(file, "setwd(\"" + path + "\")", path);
-    }
+    private static void executeCommands(FileAnalysis fileAnalysis, Path path) throws IOException, InterruptedException {
+        // Your script
+        String script =
+                "install.packages(\"styler\")\n" +
+                "install.packages(\"lintr\")\n" +
+                "install.packages(\"goodpractice\")\n"  +
+                "install.packages(\"cyclocomp\")\n" +
+                "library(lintr)\n" +
+                "library(styler)\n" +
+                "library(goodpractice)\n" +
+                "library(cyclocomp)\n" +
+                        "setwd(\"" + path + "\")\n" +
+                "file <- \"" + fileAnalysis.getName() + "\"\n" +
+                        "lint(" + path + "file)\n" +
+                        "styler::style_file(file)\n" +
+                        "goodpractice::gp(file)\n" +
+                        "cyclocomp::cyclocomp(file)\n" +
+                        "q()";
 
-    private static void executeCommand(FileAnalysis file, String command, Path path) {
-        try {
-            ProcessBuilder processBuilder = new ProcessBuilder(command);
-            processBuilder.directory(path.toFile());
+        // create a temp file and write your script to it
+        File tempScript = File.createTempFile("test_r_scripts_", "");
+        try(OutputStream output = new FileOutputStream(tempScript)) {
+            output.write(script.getBytes());
+        }
 
-            Process process = processBuilder.start();
+        // build the process object and start it
+        List<String> commandList = new ArrayList<>();
+        commandList.add("/usr/bin/Rscript");
+        commandList.add(tempScript.getAbsolutePath());
+        ProcessBuilder builder = new ProcessBuilder(commandList);
+        builder.redirectErrorStream(true);
+        Process shell = builder.start();
 
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        // read the output and show it
+        try(BufferedReader reader = new BufferedReader(
+                new InputStreamReader(shell.getInputStream()))) {
             String line;
-            while ((line = reader.readLine()) != null) {
-                //edw bgainoun ta results
+            while((line = reader.readLine()) != null) {
                 System.out.println(line);
-                processResults(file, line, command);
             }
-
-            int exitCode = process.waitFor();
-            if (exitCode == 0) {
-                System.out.println("Command executed successfully.");
-            } else {
-                System.out.println("Command failed with exit code: " + exitCode);
-            }
-        } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
         }
-    }
 
-    private static void processResults(FileAnalysis file, String line, String command) {
-        List lintList = new ArrayList<>();
-        if(command.startsWith("lint(") && line.startsWith(System.getProperty("user.dir"))) {
-            lintList.add(line);
-        } else if(command.startsWith("cyclocomp(")) {
-            file.setCycloComplexity(Integer.parseInt(line));
-        } else if(command.startsWith("styler::style_file(")) {
-            file.setStylerResult(line);
-        } else if(command.startsWith("goodpractice::gp(") && line.startsWith(System.getProperty("user.dir"))) {
+        // wait for the process to finish
+        int exitCode = shell.waitFor();
 
-        }
-        file.setLinterComments(lintList);
-    }
+        // delete your temp file
+        tempScript.delete();
 
-    private static void executeAnalysis(FileAnalysis fileAnalysis, Path path) {
-        executeLinter(fileAnalysis, path);
-        executeCycloComplexity(fileAnalysis, path);
-        executeStyler(fileAnalysis, path);
-        executeGoodPractises(fileAnalysis, path);
-    }
+        // check the exit code (exit code = 0 usually means "executed ok")
+        System.out.println("EXIT CODE: " + exitCode);
 
-    private static void executeGoodPractises(FileAnalysis fileAnalysis, Path path) {
-        executeCommand(fileAnalysis,"goodpractice::gp(" + fileAnalysis.getName() + ")", path);
-    }
-
-    private static void executeStyler(FileAnalysis fileAnalysis, Path path) {
-        executeCommand(fileAnalysis,"styler::style_file(" + fileAnalysis.getName() + ")", path);
-    }
-
-    private static void executeCycloComplexity(FileAnalysis fileAnalysis, Path path) {
-        executeCommand(fileAnalysis,"cyclocomp(" + fileAnalysis.getName() + ")", path);
-    }
-
-    private static void executeLinter(FileAnalysis fileAnalysis, Path path) {
-        executeCommand(fileAnalysis, "lint(" + fileAnalysis.getName() + ")", path);
     }
 
     private static void deleteFileFromDirectory(MultipartFile file, Path path) {

@@ -20,7 +20,7 @@ public class FileController {
     @PostMapping("/upload")
     public ResponseEntity<FileAnalysis> handleFileUpload(
             @RequestParam("owner") String owner,
-            @RequestParam("file") MultipartFile file) throws IOException {
+            @RequestParam("file") MultipartFile file) throws IOException, InterruptedException {
         FileAnalysis fileAnalysis = FileService.startMainAnalysis(file, owner);
         fileService.saveFile(fileAnalysis);
         return ResponseEntity.ok(fileAnalysis);
