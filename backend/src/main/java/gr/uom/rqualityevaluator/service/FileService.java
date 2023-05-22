@@ -42,21 +42,15 @@ public class FileService {
     private static void executeCommands(FileAnalysis fileAnalysis, Path path) throws IOException, InterruptedException {
         // Your script
         String script =
-                "install.packages(\"styler\")\n" +
                 "install.packages(\"lintr\")\n" +
-                "install.packages(\"goodpractice\")\n"  +
-                "install.packages(\"cyclocomp\")\n" +
-                "library(lintr)\n" +
-                "library(styler)\n" +
-                "library(goodpractice)\n" +
-                "library(cyclocomp)\n" +
+                        "install.packages(\"cyclocomp\")\n" +
+                        "library(lintr)\n" +
+                        "library(cyclocomp)\n" +
                         "setwd(\"" + path + "\")\n" +
-                "file <- \"" + fileAnalysis.getName() + "\"\n" +
-                        "lint(" + path + "file)\n" +
-                        "styler::style_file(file)\n" +
-                        "goodpractice::gp(file)\n" +
-                        "cyclocomp::cyclocomp(file)\n" +
-                        "q()";
+                        "analysis_file <- \"" + fileAnalysis.getName() + "\"\n" +
+                        "lintr::lint_dir(\"" + path + "\", linters = with_defaults(line_length_linter(120)))\n" +
+                        "cyclocomp::cyclocomp(analysis_file)\n" +
+                        "q()\n";
 
         // create a temp file and write your script to it
         File tempScript = File.createTempFile("test_r_scripts_", "");
