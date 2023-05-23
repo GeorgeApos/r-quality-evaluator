@@ -1,25 +1,28 @@
 package gr.uom.rqualityevaluator.service;
 
+import com.github.rcaller.rstuff.*;
+import com.github.rcaller.util.Globals;
 import gr.uom.rqualityevaluator.models.FileAnalysis;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 
 @Service
 @Configuration
 public class FileService {
 
-    public static FileAnalysis startMainAnalysis(MultipartFile file, String owner) throws IOException {
+    public static FileAnalysis startMainAnalysis(MultipartFile file, String owner) throws IOException, InterruptedException {
         FileAnalysis fileAnalysis = new FileAnalysis();
         fileAnalysis.setName(file.getOriginalFilename());
         fileAnalysis.setOwner(owner);
@@ -30,30 +33,57 @@ public class FileService {
         }
         saveFileToDirectory(file, path);
 
-        executeAnalysis(fileAnalysis, path);
+        executeCommands(fileAnalysis, path);
 
         deleteFileFromDirectory(file, path);
-        return new FileAnalysis();
+        return fileAnalysis;
     }
 
-    private static void executeAnalysis(FileAnalysis fileAnalysis, Path path) {
-        executeLinter(fileAnalysis, path);
-        executeCycloComplexity(fileAnalysis, path);
-        executeStyler(fileAnalysis, path);
-        executeGoodPractises(fileAnalysis, path);
-    }
+    private static void executeCommands(FileAnalysis fileAnalysis, Path path) throws IOException, InterruptedException {
+        // Your script
+        String script =
+                "install.packages(\"lintr\")\n" +
+                        "install.packages(\"cyclocomp\")\n" +
+                        "library(lintr)\n" +
+                        "library(cyclocomp)\n" +
+                        "setwd(\"" + path + "\")\n" +
+                        "analysis_file <- \"" + fileAnalysis.getName() + "\"\n" +
+                        "lintr::lint_dir(\"" + path + "\", linters = with_defaults(line_length_linter(120)))\n" +
+                        "cyclocomp::cyclocomp(analysis_file)\n" +
+                        "q()\n";
 
-    private static void executeGoodPractises(FileAnalysis fileAnalysis, Path path) {
-    }
+        // create a temp file and write your script to it
+        File tempScript = File.createTempFile("test_r_scripts_", "");
+        try(OutputStream output = new FileOutputStream(tempScript)) {
+            output.write(script.getBytes());
+        }
 
-    private static void executeStyler(FileAnalysis fileAnalysis, Path path) {
-    }
+        // build the process object and start it
+        List<String> commandList = new ArrayList<>();
+        commandList.add("/usr/bin/Rscript");
+        commandList.add(tempScript.getAbsolutePath());
+        ProcessBuilder builder = new ProcessBuilder(commandList);
+        builder.redirectErrorStream(true);
+        Process shell = builder.start();
 
-    private static void executeCycloComplexity(FileAnalysis fileAnalysis, Path path) {
-    }
+        // read the output and show it
+        try(BufferedReader reader = new BufferedReader(
+                new InputStreamReader(shell.getInputStream()))) {
+            String line;
+            while((line = reader.readLine()) != null) {
+                System.out.println(line);
+            }
+        }
 
-    private static void executeLinter(FileAnalysis fileAnalysis, Path path) {
-        
+        // wait for the process to finish
+        int exitCode = shell.waitFor();
+
+        // delete your temp file
+        tempScript.delete();
+
+        // check the exit code (exit code = 0 usually means "executed ok")
+        System.out.println("EXIT CODE: " + exitCode);
+
     }
 
     private static void deleteFileFromDirectory(MultipartFile file, Path path) {
